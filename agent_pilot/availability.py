@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from enum import Enum
 from pathlib import Path
 import re
 from typing import Callable
@@ -15,40 +16,54 @@ USER_AGENT = "Agent-Pilot/0.1 (+https://github.com/Krutas/Agent-Pilot)"
 _URL_RE = re.compile(r"https?://[^\s\"'<>]+")
 
 
-def url_is_reachable(url: str, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> bool:
-    """Return True when an HTTP(S) endpoint responds successfully."""
+class ProbeStatus(str, Enum):
+    AVAILABLE = "available"
+    UNAVAILABLE = "unavailable"
+    UNKNOWN = "unknown"
+
+
+def probe_url(url: str, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> ProbeStatus:
+    """Probe an endpoint without converting transient blocks into hard failures.
+
+    Only explicit permanent-not-found responses (404/410) are hard failures.
+    WAF/auth/rate-limit/server errors and network failures are UNKNOWN so a
+    temporarily blocked checker cannot hide a valid component.
+    """
     if not url or not url.startswith(("https://", "http://")):
-        return False
+        return ProbeStatus.UNAVAILABLE
 
-    def probe(method: str) -> bool:
-        request = Request(url, method=method, headers={"User-Agent": USER_AGENT})
-        with urlopen(request, timeout=timeout) as response:
-            status = response.getcode()
-            return status is None or 200 <= status < 400
+    def request(method: str) -> ProbeStatus:
+        req = Request(url, method=method, headers={"User-Agent": USER_AGENT})
+        try:
+            with urlopen(req, timeout=timeout) as response:
+                status = response.getcode()
+                if status is None or 200 <= status < 400:
+                    return ProbeStatus.AVAILABLE
+                if status in {404, 410}:
+                    return ProbeStatus.UNAVAILABLE
+                return ProbeStatus.UNKNOWN
+        except HTTPError as exc:
+            if exc.code in {404, 410}:
+                return ProbeStatus.UNAVAILABLE
+            return ProbeStatus.UNKNOWN
+        except (URLError, TimeoutError, OSError):
+            return ProbeStatus.UNKNOWN
 
-    try:
-        return probe("HEAD")
-    except HTTPError as exc:
-        # A number of installer/CDN endpoints intentionally reject HEAD.
-        if exc.code not in {403, 405, 501}:
-            return False
-    except (URLError, TimeoutError, OSError):
-        return False
+    head = request("HEAD")
+    if head is ProbeStatus.AVAILABLE or head is ProbeStatus.UNAVAILABLE:
+        return head
 
-    try:
-        return probe("GET")
-    except (HTTPError, URLError, TimeoutError, OSError):
-        return False
+    # CDNs/WAFs frequently reject HEAD while ordinary GET still succeeds.
+    return request("GET")
+
+
+def url_is_reachable(url: str, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> bool:
+    """Compatibility helper for callers that need a strict boolean."""
+    return probe_url(url, timeout=timeout) is ProbeStatus.AVAILABLE
 
 
 def component_urls(component: Component) -> tuple[str, ...]:
-    """Collect the component's primary URL and static installer URLs.
-
-    Installer scripts are part of Agent Pilot's trusted repository. Extracting
-    literal HTTP(S) endpoints here means a broken install.sh/release endpoint is
-    caught before that program is offered to the user. Package-manager installs
-    without a literal URL still get their source_url checked.
-    """
+    """Collect the component's primary URL and static installer URLs."""
     urls: list[str] = []
     if component.source_url:
         urls.append(component.source_url)
@@ -59,25 +74,29 @@ def component_urls(component: Component) -> tuple[str, ...]:
         installer_text = ""
 
     for match in _URL_RE.findall(installer_text):
-        # Strip common sentence/shell punctuation that can trail a literal URL.
         url = match.rstrip(".,);]}")
         if url and url not in urls:
             urls.append(url)
     return tuple(urls)
 
 
+def _normalise_result(result: ProbeStatus | bool) -> ProbeStatus:
+    if isinstance(result, ProbeStatus):
+        return result
+    return ProbeStatus.AVAILABLE if result else ProbeStatus.UNAVAILABLE
+
+
 def filter_available_components(
     catalog: dict[str, Component],
     *,
-    checker: Callable[[str], bool] = url_is_reachable,
+    checker: Callable[[str], ProbeStatus | bool] = probe_url,
     max_workers: int = DEFAULT_MAX_WORKERS,
 ) -> dict[str, Component]:
-    """Keep only usable active/selectable components whose URLs are reachable.
+    """Hide only components with a confirmed hard URL failure.
 
-    Every named program is checked, including infrastructure. Each candidate
-    must pass its source URL plus any static HTTP(S) URL embedded in its installer
-    script. Archived/non-selectable entries stay as metadata and remain hidden by
-    the UI. Components whose required dependency disappears are pruned too.
+    Every named program is checked, including infrastructure. UNKNOWN results
+    remain visible to avoid false negatives from WAFs, rate limits, temporary
+    server errors, DNS problems, and checker-network timeouts.
     """
     probe_targets = {
         component_id: component
@@ -88,16 +107,22 @@ def filter_available_components(
         return dict(catalog)
 
     jobs: dict[object, tuple[str, str]] = {}
-    results: dict[str, list[bool]] = {
+    results: dict[str, list[ProbeStatus]] = {
         component_id: [] for component_id in probe_targets
     }
-    worker_count = max(1, min(max_workers, sum(max(1, len(component_urls(c))) for c in probe_targets.values())))
+    worker_count = max(
+        1,
+        min(
+            max_workers,
+            sum(max(1, len(component_urls(c))) for c in probe_targets.values()),
+        ),
+    )
 
     with ThreadPoolExecutor(max_workers=worker_count) as pool:
         for component_id, component in probe_targets.items():
             urls = component_urls(component)
             if not urls:
-                results[component_id].append(False)
+                results[component_id].append(ProbeStatus.UNAVAILABLE)
                 continue
             for url in urls:
                 jobs[pool.submit(checker, url)] = (component_id, url)
@@ -105,23 +130,23 @@ def filter_available_components(
         for future in as_completed(jobs):
             component_id, _url = jobs[future]
             try:
-                results[component_id].append(bool(future.result()))
+                results[component_id].append(_normalise_result(future.result()))
             except Exception:
-                results[component_id].append(False)
+                # A checker failure is not evidence that the upstream is dead.
+                results[component_id].append(ProbeStatus.UNKNOWN)
 
-    reachable = {
+    hard_failed = {
         component_id
         for component_id, checks in results.items()
-        if checks and all(checks)
+        if any(status is ProbeStatus.UNAVAILABLE for status in checks)
     }
 
     available = {
         component_id: component
         for component_id, component in catalog.items()
-        if component_id not in probe_targets or component_id in reachable
+        if component_id not in hard_failed
     }
 
-    # Dependency-aware pruning. Repeat because dependency chains may be nested.
     changed = True
     while changed:
         changed = False
