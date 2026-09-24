@@ -1,6 +1,8 @@
 from pathlib import Path
+from urllib.error import HTTPError
 
-from agent_pilot.availability import component_urls, filter_available_components
+import agent_pilot.availability as availability
+from agent_pilot.availability import ProbeStatus, component_urls, filter_available_components
 from agent_pilot.catalog import load_catalog, resolve_dependencies
 from agent_pilot.models import Component
 
@@ -55,6 +57,16 @@ def test_component_urls_include_installer_links(tmp_path):
     )
 
 
+def test_dynamic_installer_urls_are_not_probed(tmp_path):
+    installer = tmp_path / "install.sh"
+    installer.write_text(
+        'asset="demo.tar.gz"\nurl="https://downloads.example.test/${asset}"\n',
+        encoding="utf-8",
+    )
+    component = _component("demo", installer)
+    assert component_urls(component) == ("https://example.test/demo",)
+
+
 def test_unreachable_component_is_hidden(tmp_path):
     good_script = tmp_path / "good.sh"; good_script.write_text("#!/bin/sh\n", encoding="utf-8")
     bad_script = tmp_path / "bad.sh"; bad_script.write_text("#!/bin/sh\n", encoding="utf-8")
@@ -67,6 +79,16 @@ def test_unreachable_component_is_hidden(tmp_path):
         checker=lambda url: not url.endswith("/bad"),
     )
     assert set(filtered) == {"good"}
+
+
+def test_unknown_probe_keeps_component_visible(tmp_path):
+    installer = tmp_path / "demo.sh"; installer.write_text("#!/bin/sh\n", encoding="utf-8")
+    catalog = {"demo": _component("demo", installer)}
+    filtered = filter_available_components(
+        catalog,
+        checker=lambda _url: ProbeStatus.UNKNOWN,
+    )
+    assert "demo" in filtered
 
 
 def test_component_with_broken_installer_url_is_hidden(tmp_path):
@@ -96,3 +118,24 @@ def test_component_with_missing_dependency_is_hidden(tmp_path):
     )
     assert "base" not in filtered
     assert "child" not in filtered
+
+
+def test_head_404_is_confirmed_with_get_before_hard_failure(monkeypatch):
+    calls = []
+
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *_args): return False
+        def getcode(self): return 200
+
+    def fake_urlopen(request, timeout):
+        del timeout
+        method = request.get_method()
+        calls.append(method)
+        if method == "HEAD":
+            raise HTTPError(request.full_url, 404, "not found", None, None)
+        return Response()
+
+    monkeypatch.setattr(availability, "urlopen", fake_urlopen)
+    assert availability.probe_url("https://example.test/install.sh") is ProbeStatus.AVAILABLE
+    assert calls == ["HEAD", "GET"]
