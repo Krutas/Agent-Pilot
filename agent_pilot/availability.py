@@ -23,11 +23,12 @@ class ProbeStatus(str, Enum):
 
 
 def probe_url(url: str, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> ProbeStatus:
-    """Probe an endpoint without converting transient blocks into hard failures.
+    """Probe an endpoint while avoiding false negatives.
 
-    Only explicit permanent-not-found responses (404/410) are hard failures.
-    WAF/auth/rate-limit/server errors and network failures are UNKNOWN so a
-    temporarily blocked checker cannot hide a valid component.
+    HEAD is only an optimization. A non-successful HEAD is always verified with
+    a real GET because CDNs/WAFs may return 403/404/405 to HEAD while GET works.
+    Only a GET-confirmed 404/410 is considered a hard failure. Auth/rate-limit,
+    5xx, DNS, timeout, and other transport failures are UNKNOWN and stay visible.
     """
     if not url or not url.startswith(("https://", "http://")):
         return ProbeStatus.UNAVAILABLE
@@ -50,10 +51,10 @@ def probe_url(url: str, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> ProbeStatus
             return ProbeStatus.UNKNOWN
 
     head = request("HEAD")
-    if head is ProbeStatus.AVAILABLE or head is ProbeStatus.UNAVAILABLE:
+    if head is ProbeStatus.AVAILABLE:
         return head
 
-    # CDNs/WAFs frequently reject HEAD while ordinary GET still succeeds.
+    # Confirm every HEAD failure with GET before hiding anything.
     return request("GET")
 
 
@@ -63,7 +64,11 @@ def url_is_reachable(url: str, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> bool
 
 
 def component_urls(component: Component) -> tuple[str, ...]:
-    """Collect the component's primary URL and static installer URLs."""
+    """Collect the component's primary URL and literal installer URLs.
+
+    Dynamic shell URLs containing variables are deliberately skipped: probing a
+    template such as .../${asset} would create a fake 404 and a false negative.
+    """
     urls: list[str] = []
     if component.source_url:
         urls.append(component.source_url)
@@ -75,6 +80,8 @@ def component_urls(component: Component) -> tuple[str, ...]:
 
     for match in _URL_RE.findall(installer_text):
         url = match.rstrip(".,);]}")
+        if "$" in url or "{" in url or "}" in url:
+            continue
         if url and url not in urls:
             urls.append(url)
     return tuple(urls)
