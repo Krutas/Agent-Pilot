@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+from .availability import filter_available_components
 from .catalog import load_catalog, resolve_dependencies
 from .models import InstallPlan
 from .runner import execute_plan, render_plan
@@ -19,14 +20,25 @@ def parse_args():
 
 def main() -> int:
     args = parse_args()
-    catalog = load_catalog()
+    full_catalog = load_catalog()
+    catalog = filter_available_components(full_catalog)
     if args.list_components:
         for c in catalog.values():
-            print(f"{c.id:16} {c.name:24} {c.status:10} {c.description}")
+            if c.status == "active" and c.selectable:
+                print(f"{c.id:16} {c.name:24} {c.status:10} {c.description}")
         return 0
     try:
         role = args.role or choose_role()
-        selected = [x.strip() for x in args.components.split(",") if x.strip()] if args.components else choose_components(role, catalog)
+        if args.components:
+            requested = [x.strip() for x in args.components.split(",") if x.strip()]
+            unavailable = [x for x in requested if x in full_catalog and x not in catalog]
+            if unavailable:
+                raise SystemExit(
+                    "Components currently unavailable: " + ", ".join(unavailable)
+                )
+            selected = requested
+        else:
+            selected = choose_components(role, catalog)
         selected = resolve_dependencies(selected, catalog)
         components = tuple(catalog[x] for x in selected)
         illegal = [c.id for c in components if c.roles and role not in c.roles]
