@@ -20,6 +20,7 @@ class Component:
     model_integration: str = "user-managed"
     status: str = "active"
     selectable: bool = True
+    availability_urls: tuple[str, ...] = field(default_factory=tuple)
 
 @dataclass(frozen=True)
 class InstallPlan:
