@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-pilot"
+version = "0.1.0"
+description = "Vendor-neutral TUI installer for agent gateways, private networking, and AI workers"
+requires-python = ">=3.10"
+dependencies = ["questionary>=2.1,<3", "PyYAML>=6.0,<7"]
+
+[project.scripts]
+agent-pilot = "agent_pilot.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["agent_pilot*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

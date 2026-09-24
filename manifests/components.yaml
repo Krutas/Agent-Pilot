@@ -1,0 +1,181 @@
+schema: 2
+registry:
+  description: Open-source agent applications and infrastructure components supported by Agent Pilot.
+  model_policy: user-managed
+components:
+  agentgateway:
+    name: AgentGateway
+    category: gateway
+    kind: infrastructure
+    description: MCP/A2A gateway and routing layer
+    source_url: https://github.com/agentgateway/agentgateway
+    docs_url: https://agentgateway.dev/
+    license: Apache-2.0
+    interface: [service]
+    installer: scripts/components/agentgateway.sh
+    roles: [gateway]
+    recommended: true
+    status: active
+  tailscale:
+    name: Tailscale
+    category: network
+    kind: infrastructure
+    description: Private WireGuard-based node connectivity
+    source_url: https://github.com/tailscale/tailscale
+    docs_url: https://tailscale.com/
+    license: BSD-3-Clause
+    interface: [service]
+    installer: scripts/components/tailscale.sh
+    roles: [gateway, worker, headscale]
+    recommended: true
+    status: active
+  headscale:
+    name: Headscale
+    category: control-plane
+    kind: infrastructure
+    description: Self-hosted Tailscale-compatible control server
+    source_url: https://github.com/juanfont/headscale
+    docs_url: https://headscale.net/
+    license: BSD-3-Clause
+    interface: [service]
+    installer: scripts/components/headscale.sh
+    roles: [headscale]
+    recommended: true
+    status: active
+  hermes:
+    name: Hermes Agent
+    category: agent
+    kind: agent-app
+    description: General-purpose terminal AI agent with MCP support
+    source_url: https://github.com/NousResearch/hermes-agent
+    docs_url: https://hermes-agent.nousresearch.com/
+    license: MIT
+    interface: [terminal, desktop]
+    protocols: [MCP]
+    installer: scripts/components/hermes.sh
+    roles: [worker, gateway]
+    model_integration: user-managed
+    status: active
+  opencode:
+    name: OpenCode
+    category: agent
+    kind: agent-app
+    description: Open-source coding agent for terminal and desktop
+    source_url: https://github.com/anomalyco/opencode
+    docs_url: https://opencode.ai/
+    license: MIT
+    interface: [terminal, desktop]
+    protocols: [MCP]
+    installer: scripts/components/opencode.sh
+    roles: [worker, gateway]
+    model_integration: user-managed
+    status: active
+  codex:
+    name: Codex CLI
+    category: agent
+    kind: agent-app
+    description: Open-source coding agent CLI
+    source_url: https://github.com/openai/codex
+    docs_url: https://developers.openai.com/codex/
+    license: Apache-2.0
+    interface: [terminal, desktop, ide]
+    installer: scripts/components/codex.sh
+    roles: [worker, gateway]
+    model_integration: user-managed
+    status: active
+  aider:
+    name: Aider
+    category: agent
+    kind: agent-app
+    description: AI pair programming agent in the terminal
+    source_url: https://github.com/Aider-AI/aider
+    docs_url: https://aider.chat/
+    license: Apache-2.0
+    interface: [terminal]
+    installer: scripts/components/aider.sh
+    roles: [worker, gateway]
+    model_integration: user-managed
+    status: active
+  cline:
+    name: Cline
+    category: agent
+    kind: agent-app
+    description: Open-source coding agent with CLI and IDE integrations
+    source_url: https://github.com/cline/cline
+    docs_url: https://docs.cline.bot/
+    license: Apache-2.0
+    interface: [terminal, ide]
+    installer: scripts/components/cline.sh
+    roles: [worker, gateway]
+    model_integration: user-managed
+    status: active
+  goose:
+    name: goose
+    category: agent
+    kind: agent-app
+    description: General-purpose open-source agent
+    source_url: https://github.com/aaif-goose/goose
+    docs_url: https://block.github.io/goose/
+    license: Apache-2.0
+    interface: [terminal, desktop, api]
+    protocols: [MCP, ACP]
+    installer: scripts/components/goose.sh
+    roles: [worker, gateway]
+    model_integration: user-managed
+    status: active
+  openhands:
+    name: OpenHands Agent Canvas
+    category: agent
+    kind: agent-app
+    description: Open-source agent control surface and local agent stack
+    source_url: https://github.com/OpenHands/OpenHands
+    docs_url: https://docs.openhands.dev/
+    license: MIT
+    interface: [web, service]
+    protocols: [ACP]
+    installer: scripts/components/openhands.sh
+    roles: [worker, gateway]
+    model_integration: user-managed
+    status: active
+  gemini-cli:
+    name: Gemini CLI
+    category: agent
+    kind: agent-app
+    description: Open-source terminal AI agent
+    source_url: https://github.com/google-gemini/gemini-cli
+    docs_url: https://geminicli.com/
+    license: Apache-2.0
+    interface: [terminal]
+    protocols: [MCP, A2A]
+    installer: scripts/components/gemini-cli.sh
+    roles: [worker, gateway]
+    model_integration: user-managed
+    status: active
+  qwen-code:
+    name: Qwen Code
+    category: agent
+    kind: agent-app
+    description: Open-source terminal coding agent
+    source_url: https://github.com/QwenLM/qwen-code
+    docs_url: https://github.com/QwenLM/qwen-code/tree/main/docs
+    license: Apache-2.0
+    interface: [terminal, desktop, web, ide]
+    protocols: [MCP]
+    installer: scripts/components/qwen-code.sh
+    roles: [worker, gateway]
+    model_integration: user-managed
+    status: active
+  roo-code:
+    name: Roo Code CLI (legacy)
+    category: agent
+    kind: agent-app
+    description: Archived entry retained for discoverability
+    source_url: https://github.com/RooCodeInc/Roo-Code
+    docs_url: https://docs.roocode.com/
+    license: Apache-2.0
+    interface: [terminal, ide]
+    installer: scripts/components/roo-code.sh
+    roles: [worker, gateway]
+    model_integration: user-managed
+    status: archived
+    selectable: false
