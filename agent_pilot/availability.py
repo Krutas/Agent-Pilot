@@ -47,11 +47,12 @@ def filter_available_components(
     checker: Callable[[str], bool] = url_is_reachable,
     max_workers: int = DEFAULT_MAX_WORKERS,
 ) -> dict[str, Component]:
-    """Keep only selectable active components whose primary URL works.
+    """Keep only usable active/selectable components with reachable source URLs.
 
-    This applies to every named program in the manifest: agent apps and
-    infrastructure alike. Archived or explicitly non-selectable entries remain
-    in the catalog for metadata/dependency integrity; the UI already hides them.
+    Every named program is checked, including infrastructure. Archived or
+    explicitly non-selectable entries remain as metadata. After URL filtering,
+    any selectable component whose required dependency disappeared is also
+    removed so the UI never offers an install plan that cannot be resolved.
     """
     probe_targets = {
         component_id: component
@@ -77,8 +78,21 @@ def filter_available_components(
                 # One bad upstream/check must not abort the whole installer.
                 pass
 
-    return {
+    available = {
         component_id: component
         for component_id, component in catalog.items()
         if component_id not in probe_targets or component_id in reachable
     }
+
+    # Dependency-aware pruning. Repeat because dependencies can be chained.
+    changed = True
+    while changed:
+        changed = False
+        for component_id, component in tuple(available.items()):
+            if component_id not in probe_targets:
+                continue
+            if any(dep not in available for dep in component.requires):
+                del available[component_id]
+                changed = True
+
+    return available
