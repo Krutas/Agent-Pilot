@@ -32,6 +32,7 @@ def load_catalog(path: Path = MANIFEST) -> dict[str, Component]:
             model_integration=item.get("model_integration", "user-managed"),
             status=item.get("status", "active"),
             selectable=bool(item.get("selectable", True)),
+            availability_urls=tuple(item.get("availability_urls", [])),
         )
     validate_catalog(result)
     return result
