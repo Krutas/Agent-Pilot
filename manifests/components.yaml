@@ -10,6 +10,9 @@ components:
     description: MCP/A2A gateway and routing layer
     source_url: https://github.com/agentgateway/agentgateway
     docs_url: https://agentgateway.dev/
+    availability_urls:
+      - https://agentgateway.dev/install
+      - https://github.com/agentgateway/agentgateway/releases/latest
     license: Apache-2.0
     interface: [service]
     installer: scripts/components/agentgateway.sh
@@ -23,6 +26,9 @@ components:
     description: Private WireGuard-based node connectivity
     source_url: https://github.com/tailscale/tailscale
     docs_url: https://tailscale.com/
+    availability_urls:
+      - https://tailscale.com/install.sh
+      - https://pkgs.tailscale.com/stable/
     license: BSD-3-Clause
     interface: [service]
     installer: scripts/components/tailscale.sh
@@ -36,6 +42,9 @@ components:
     description: Self-hosted Tailscale-compatible control server
     source_url: https://github.com/juanfont/headscale
     docs_url: https://headscale.net/
+    availability_urls:
+      - https://api.github.com/repos/juanfont/headscale/releases/latest
+      - https://github.com/juanfont/headscale/releases/latest
     license: BSD-3-Clause
     interface: [service]
     installer: scripts/components/headscale.sh
@@ -49,6 +58,9 @@ components:
     description: General-purpose terminal AI agent with MCP support
     source_url: https://github.com/NousResearch/hermes-agent
     docs_url: https://hermes-agent.nousresearch.com/
+    availability_urls:
+      - https://hermes-agent.nousresearch.com/install.sh
+      - https://github.com/NousResearch/hermes-agent
     license: MIT
     interface: [terminal, desktop]
     protocols: [MCP]
@@ -63,6 +75,10 @@ components:
     description: Open-source coding agent for terminal and desktop
     source_url: https://github.com/anomalyco/opencode
     docs_url: https://opencode.ai/
+    availability_urls:
+      - https://opencode.ai/v2/install
+      - https://registry.npmjs.org/@opencode%2Fcli
+      - https://github.com/anomalyco/opencode/releases/latest
     license: MIT
     interface: [terminal, desktop]
     protocols: [MCP]
@@ -77,6 +93,10 @@ components:
     description: Open-source coding agent CLI
     source_url: https://github.com/openai/codex
     docs_url: https://developers.openai.com/codex/
+    availability_urls:
+      - https://chatgpt.com/codex/install.sh
+      - https://registry.npmjs.org/@openai%2Fcodex
+      - https://github.com/openai/codex/releases/latest
     license: Apache-2.0
     interface: [terminal, desktop, ide]
     installer: scripts/components/codex.sh
@@ -90,6 +110,9 @@ components:
     description: AI pair programming agent in the terminal
     source_url: https://github.com/Aider-AI/aider
     docs_url: https://aider.chat/
+    availability_urls:
+      - https://aider.chat/install.sh
+      - https://pypi.org/pypi/aider-chat/json
     license: Apache-2.0
     interface: [terminal]
     installer: scripts/components/aider.sh
@@ -103,6 +126,9 @@ components:
     description: Open-source coding agent with CLI and IDE integrations
     source_url: https://github.com/cline/cline
     docs_url: https://docs.cline.bot/
+    availability_urls:
+      - https://registry.npmjs.org/cline
+      - https://github.com/cline/cline
     license: Apache-2.0
     interface: [terminal, ide]
     installer: scripts/components/cline.sh
@@ -116,6 +142,9 @@ components:
     description: General-purpose open-source agent
     source_url: https://github.com/aaif-goose/goose
     docs_url: https://block.github.io/goose/
+    availability_urls:
+      - https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh
+      - https://github.com/aaif-goose/goose/releases/latest
     license: Apache-2.0
     interface: [terminal, desktop, api]
     protocols: [MCP, ACP]
@@ -130,6 +159,9 @@ components:
     description: Open-source agent control surface and local agent stack
     source_url: https://github.com/OpenHands/OpenHands
     docs_url: https://docs.openhands.dev/
+    availability_urls:
+      - https://registry.npmjs.org/@openhands%2Fagent-canvas
+      - https://github.com/OpenHands/OpenHands
     license: MIT
     interface: [web, service]
     protocols: [ACP]
@@ -144,6 +176,9 @@ components:
     description: Open-source terminal AI agent
     source_url: https://github.com/google-gemini/gemini-cli
     docs_url: https://geminicli.com/
+    availability_urls:
+      - https://registry.npmjs.org/@google%2Fgemini-cli
+      - https://github.com/google-gemini/gemini-cli/releases/latest
     license: Apache-2.0
     interface: [terminal]
     protocols: [MCP, A2A]
@@ -158,6 +193,10 @@ components:
     description: Open-source terminal coding agent
     source_url: https://github.com/QwenLM/qwen-code
     docs_url: https://github.com/QwenLM/qwen-code/tree/main/docs
+    availability_urls:
+      - https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh
+      - https://registry.npmjs.org/@qwen-code%2Fqwen-code
+      - https://github.com/QwenLM/qwen-code/releases/latest
     license: Apache-2.0
     interface: [terminal, desktop, web, ide]
     protocols: [MCP]
