@@ -25,10 +25,9 @@ class ProbeStatus(str, Enum):
 def probe_url(url: str, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> ProbeStatus:
     """Probe an endpoint while avoiding false negatives.
 
-    HEAD is only an optimization. A non-successful HEAD is always verified with
-    a real GET because CDNs/WAFs may return 403/404/405 to HEAD while GET works.
-    Only a GET-confirmed 404/410 is considered a hard failure. Auth/rate-limit,
-    5xx, DNS, timeout, and other transport failures are UNKNOWN and stay visible.
+    HEAD is only an optimization. Every non-successful HEAD is verified with GET.
+    Only a GET-confirmed 404/410 is a hard failure. WAF/auth/rate-limit/5xx/DNS/
+    timeout failures are UNKNOWN and do not hide a component.
     """
     if not url or not url.startswith(("https://", "http://")):
         return ProbeStatus.UNAVAILABLE
@@ -53,22 +52,23 @@ def probe_url(url: str, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> ProbeStatus
     head = request("HEAD")
     if head is ProbeStatus.AVAILABLE:
         return head
-
-    # Confirm every HEAD failure with GET before hiding anything.
     return request("GET")
 
 
 def url_is_reachable(url: str, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> bool:
-    """Compatibility helper for callers that need a strict boolean."""
     return probe_url(url, timeout=timeout) is ProbeStatus.AVAILABLE
 
 
 def component_urls(component: Component) -> tuple[str, ...]:
-    """Collect the component's primary URL and literal installer URLs.
+    """Return explicit install-route URLs, with legacy discovery as fallback.
 
-    Dynamic shell URLs containing variables are deliberately skipped: probing a
-    template such as .../${asset} would create a fake 404 and a false negative.
+    availability_urls are authoritative when configured. This prevents a dead
+    source/docs URL from hiding a component whose npm/PyPI/release route works.
+    Older manifest entries fall back to source_url plus literal installer URLs.
     """
+    if component.availability_urls:
+        return component.availability_urls
+
     urls: list[str] = []
     if component.source_url:
         urls.append(component.source_url)
@@ -99,11 +99,10 @@ def filter_available_components(
     checker: Callable[[str], ProbeStatus | bool] = probe_url,
     max_workers: int = DEFAULT_MAX_WORKERS,
 ) -> dict[str, Component]:
-    """Hide only components with a confirmed hard URL failure.
+    """Hide a component only when every configured install route is hard-dead.
 
-    Every named program is checked, including infrastructure. UNKNOWN results
-    remain visible to avoid false negatives from WAFs, rate limits, temporary
-    server errors, DNS problems, and checker-network timeouts.
+    One good route is sufficient. UNKNOWN also keeps the component visible to
+    avoid false negatives caused by WAFs, temporary outages, DNS, or timeouts.
     """
     probe_targets = {
         component_id: component
@@ -129,7 +128,7 @@ def filter_available_components(
         for component_id, component in probe_targets.items():
             urls = component_urls(component)
             if not urls:
-                results[component_id].append(ProbeStatus.UNAVAILABLE)
+                results[component_id].append(ProbeStatus.UNKNOWN)
                 continue
             for url in urls:
                 jobs[pool.submit(checker, url)] = (component_id, url)
@@ -139,13 +138,12 @@ def filter_available_components(
             try:
                 results[component_id].append(_normalise_result(future.result()))
             except Exception:
-                # A checker failure is not evidence that the upstream is dead.
                 results[component_id].append(ProbeStatus.UNKNOWN)
 
     hard_failed = {
         component_id
         for component_id, checks in results.items()
-        if any(status is ProbeStatus.UNAVAILABLE for status in checks)
+        if checks and all(status is ProbeStatus.UNAVAILABLE for status in checks)
     }
 
     available = {
